@@ -61,7 +61,7 @@ class LobbyService {
           houseToFollowCount,
         });
 
-        return toLobbyResponse(lobby);
+        return { lobby: toLobbyResponse(lobby), lobbyId: lobby.id };
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -86,7 +86,7 @@ class LobbyService {
       throw new AppError('Lobby not found.', NOT_FOUND);
     }
 
-    return toLobbyResponse(lobby);
+    return { lobby: toLobbyResponse(lobby), lobbyId: lobby.id };
   }
 
   async joinLobby(code, userId) {
@@ -114,7 +114,7 @@ class LobbyService {
     await this.lobbyRepository.addOrReactivatePlayer(lobby.id, userId);
 
     const updatedLobby = await this.lobbyRepository.findById(lobby.id);
-    return toLobbyResponse(updatedLobby);
+    return { lobby: toLobbyResponse(updatedLobby), lobbyId: updatedLobby.id };
   }
 
   async leaveLobby(code, userId) {
@@ -137,12 +137,12 @@ class LobbyService {
       // Host leaves before game start -> mark host left and cancel lobby
       await this.lobbyRepository.updatePlayerLeft(lobby.id, userId);
       const cancelledLobby = await this.lobbyRepository.updateStatus(lobby.id, 'CANCELLED');
-      return toLobbyResponse(cancelledLobby);
+      return { lobby: toLobbyResponse(cancelledLobby), lobbyId: cancelledLobby.id };
     }
 
     await this.lobbyRepository.updatePlayerLeft(lobby.id, userId);
     const updatedLobby = await this.lobbyRepository.findById(lobby.id);
-    return toLobbyResponse(updatedLobby);
+    return { lobby: toLobbyResponse(updatedLobby), lobbyId: updatedLobby.id };
   }
 
   async updateSettings(code, hostUserId, settingsData) {
@@ -182,7 +182,7 @@ class LobbyService {
     }
 
     const updatedLobby = await this.lobbyRepository.updateSettings(lobby.id, updateData);
-    return toLobbyResponse(updatedLobby);
+    return { lobby: toLobbyResponse(updatedLobby), lobbyId: updatedLobby.id };
   }
 }
 

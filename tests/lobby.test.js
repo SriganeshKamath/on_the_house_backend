@@ -459,13 +459,11 @@ describe('Lobby Management Domain', () => {
       const dbLobby = await prisma.lobby.findUnique({ where: { code } });
       if (dbLobby) createdLobbyIds.push(dbLobby.id);
 
-      const joiners = await Promise.all([
-        createTestUser(),
-        createTestUser(),
-        createTestUser(),
-        createTestUser(),
-        createTestUser(),
-      ]);
+      const joiners = [];
+      for (let i = 0; i < 5; i += 1) {
+        joiners.push(await createTestUser());
+      }
+
 
       const joinPromises = joiners.map(({ token }) =>
         apiRequest(`/api/v1/lobbies/${code}/join`, 'POST', {}, token),

@@ -7,9 +7,11 @@ function createServer() {
   const app = createApp();
   const httpServer = http.createServer(app);
   const io = createSocketServer(httpServer);
+  app.set('io', io);
 
   return { app, httpServer, io };
 }
+
 
 if (require.main === module) {
   const { httpServer } = createServer();

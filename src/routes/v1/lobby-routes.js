@@ -6,6 +6,7 @@ const {
   leaveLobby,
   updateSettings,
 } = require('../../controllers/lobby-controller');
+const { startGame, getGame } = require('../../controllers/game-controller');
 const { authenticate } = require('../../middleware/authenticate');
 const { validateBody, validateParams } = require('../../validators/request-validator');
 const {
@@ -29,5 +30,8 @@ lobbyRouter.patch(
   validateBody(updateSettingsSchema),
   updateSettings,
 );
+lobbyRouter.post('/:code/start', validateParams(codeParamSchema), startGame);
+lobbyRouter.get('/:code/game', validateParams(codeParamSchema), getGame);
 
 module.exports = { lobbyRouter };
+
