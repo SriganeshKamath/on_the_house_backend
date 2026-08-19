@@ -15,4 +15,19 @@ function validateBody(schema) {
   };
 }
 
-module.exports = { validateBody };
+function validateParams(schema) {
+  return (request, _response, next) => {
+    const parsed = schema.safeParse(request.params);
+
+    if (!parsed.success) {
+      next(new AppError('Invalid request parameter.', BAD_REQUEST));
+      return;
+    }
+
+    request.validatedParams = parsed.data;
+    next();
+  };
+}
+
+module.exports = { validateBody, validateParams };
+
