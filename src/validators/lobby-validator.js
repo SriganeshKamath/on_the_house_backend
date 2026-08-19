@@ -26,8 +26,13 @@ const updateSettingsSchema = z
     { message: 'At least one setting (numberCallingInterval or houseToFollowCount) must be provided.' },
   );
 
+const markTicketSchema = z.object({
+  number: z.number().int().min(1).max(90, 'Number must be between 1 and 90'),
+});
+
 module.exports = {
   createLobbySchema,
   codeParamSchema,
   updateSettingsSchema,
+  markTicketSchema,
 };

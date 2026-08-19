@@ -7,12 +7,14 @@ const {
   updateSettings,
 } = require('../../controllers/lobby-controller');
 const { startGame, getGame } = require('../../controllers/game-controller');
+const { getTicket, markTicketNumber } = require('../../controllers/ticket-controller');
 const { authenticate } = require('../../middleware/authenticate');
 const { validateBody, validateParams } = require('../../validators/request-validator');
 const {
   createLobbySchema,
   codeParamSchema,
   updateSettingsSchema,
+  markTicketSchema,
 } = require('../../validators/lobby-validator');
 
 const lobbyRouter = Router();
@@ -32,6 +34,13 @@ lobbyRouter.patch(
 );
 lobbyRouter.post('/:code/start', validateParams(codeParamSchema), startGame);
 lobbyRouter.get('/:code/game', validateParams(codeParamSchema), getGame);
+lobbyRouter.get('/:code/ticket', validateParams(codeParamSchema), getTicket);
+lobbyRouter.post(
+  '/:code/ticket/mark',
+  validateParams(codeParamSchema),
+  validateBody(markTicketSchema),
+  markTicketNumber
+);
 
 module.exports = { lobbyRouter };
 

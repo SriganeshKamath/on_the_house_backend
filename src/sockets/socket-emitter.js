@@ -28,6 +28,11 @@ function emitNumberCalled(io, gameId, payload) {
   io.to(`game:${gameId}`).emit('game:number-called', payload);
 }
 
+function emitTicketMarked(io, userId, payload) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('ticket:marked', payload);
+}
+
 module.exports = {
   emitLobbyPlayerJoined,
   emitLobbyPlayerLeft,
@@ -35,5 +40,6 @@ module.exports = {
   emitLobbySettingsUpdated,
   emitGameStarted,
   emitNumberCalled,
+  emitTicketMarked,
 };
 
