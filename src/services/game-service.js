@@ -1,5 +1,7 @@
+const { Prisma } = require('@prisma/client');
 const { prisma } = require('../config/prisma');
 const { GameRepository } = require('../repositories/game-repository');
+
 const { LobbyRepository, LOBBY_INCLUDE } = require('../repositories/lobby-repository');
 const { TicketService } = require('./ticket-service');
 const { AppError } = require('../utils/app-error');
@@ -113,54 +115,75 @@ class GameService {
       );
     }
 
-    const gameResult = await prisma.$transaction(async (tx) => {
-      const lockedLobby = await tx.lobby.findUnique({
-        where: { id: lobby.id },
-        include: LOBBY_INCLUDE,
-      });
+    try {
+      const gameResult = await prisma.$transaction(
+        async (tx) => {
+          const lockedLobby = await tx.lobby.findUnique({
+            where: { id: lobby.id },
+            include: LOBBY_INCLUDE,
+          });
 
-      if (!lockedLobby || lockedLobby.status !== 'WAITING') {
-        throw new AppError('Lobby is no longer in WAITING status.', CONFLICT);
-      }
+          if (!lockedLobby || lockedLobby.status !== 'WAITING') {
+            throw new AppError('Lobby is no longer in WAITING status.', CONFLICT);
+          }
 
-      await tx.lobby.update({
-        where: { id: lobby.id },
-        data: { status: 'STARTING' },
-      });
+          await tx.lobby.update({
+            where: { id: lobby.id },
+            data: { status: 'STARTING' },
+          });
 
-      const activeUserIds = activePlayers.map((p) => p.userId);
+          const activeUserIds = activePlayers.map((p) => p.userId);
 
-      const game = await this.gameRepository.createGameWithPlayersAndSettings(tx, {
+          const game = await this.gameRepository.createGameWithPlayersAndSettings(tx, {
+            lobbyId: lobby.id,
+            numberCallingInterval: interval,
+            houseToFollowCount: h2f,
+            userIds: activeUserIds,
+          });
+
+          for (const player of game.players) {
+            await this.ticketService.createTicketForPlayer(tx, player.id);
+          }
+
+          const startedGame = await this.gameRepository.updateStatus(tx, game.id, 'IN_PROGRESS', {
+            startedAt: new Date(),
+          });
+
+          await tx.lobby.update({
+            where: { id: lobby.id },
+            data: { status: 'IN_PROGRESS' },
+          });
+
+          return startedGame;
+        },
+        { maxWait: 10000, timeout: 30000 },
+      );
+
+      // Re-fetch fully populated game with relations & lobby code
+      const finalGame = await this.gameRepository.findById(gameResult.id);
+
+      return {
+        game: toGameResponse(finalGame, hostUserId),
         lobbyId: lobby.id,
-        numberCallingInterval: interval,
-        houseToFollowCount: h2f,
-        userIds: activeUserIds,
-      });
-
-      for (const player of game.players) {
-        await this.ticketService.createTicketForPlayer(tx, player.id);
+        isAlreadyStarted: false,
+      };
+    } catch (error) {
+      if (
+        (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') ||
+        (error instanceof AppError && error.statusCode === CONFLICT)
+      ) {
+        const existingGame = await this.gameRepository.findByLobbyId(lobby.id);
+        if (existingGame) {
+          return {
+            game: toGameResponse(existingGame, hostUserId),
+            lobbyId: lobby.id,
+            isAlreadyStarted: true,
+          };
+        }
       }
+      throw error;
+    }
 
-      const startedGame = await this.gameRepository.updateStatus(tx, game.id, 'IN_PROGRESS', {
-        startedAt: new Date(),
-      });
-
-      await tx.lobby.update({
-        where: { id: lobby.id },
-        data: { status: 'IN_PROGRESS' },
-      });
-
-      return startedGame;
-    });
-
-    // Re-fetch fully populated game with relations & lobby code
-    const finalGame = await this.gameRepository.findById(gameResult.id);
-
-    return {
-      game: toGameResponse(finalGame, hostUserId),
-      lobbyId: lobby.id,
-      isAlreadyStarted: false,
-    };
   }
 
   async getGameByLobbyCode(code, requestingUserId) {

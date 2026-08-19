@@ -1,38 +1,53 @@
+const { generateTicket } = require('../game/ticket/ticket-generator');
+const { validateTicket } = require('../evaluation/ticket/ticket-validator');
+const { AppError } = require('../utils/app-error');
+const { INTERNAL_SERVER_ERROR } = require('../constants/http-status');
+
 class TicketService {
   /**
-   * Creates a ticket for a GamePlayer inside a Prisma transaction boundary.
-   * Detailed layout logic will be expanded in the Ticket Generation phase.
+   * Generates and validates a new 90-ball Housie ticket structure.
+   */
+  generateAndValidateTicket() {
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+      attempts += 1;
+      const ticketNumbers = generateTicket();
+      const validation = validateTicket(ticketNumbers);
+
+      if (validation.valid) {
+        return ticketNumbers;
+      }
+    }
+
+    throw new AppError('Failed to generate a valid ticket.', INTERNAL_SERVER_ERROR);
+  }
+
+  /**
+   * Creates and persists a validated ticket for a GamePlayer inside a transaction boundary.
    */
   async createTicketForPlayer(tx, gamePlayerId) {
-    // Basic valid ticket structure: 15 unique numbers across 3 rows and 9 columns
-    const initialNumbers = [
-      // Row 0
-      { row: 0, column: 0, number: 5 },
-      { row: 0, column: 2, number: 21 },
-      { row: 0, column: 4, number: 43 },
-      { row: 0, column: 6, number: 62 },
-      { row: 0, column: 8, number: 85 },
-      // Row 1
-      { row: 1, column: 1, number: 14 },
-      { row: 1, column: 3, number: 36 },
-      { row: 1, column: 5, number: 51 },
-      { row: 1, column: 7, number: 73 },
-      { row: 1, column: 8, number: 89 },
-      // Row 2
-      { row: 2, column: 0, number: 8 },
-      { row: 2, column: 2, number: 27 },
-      { row: 2, column: 4, number: 49 },
-      { row: 2, column: 6, number: 68 },
-      { row: 2, column: 7, number: 79 },
-    ];
+    const validTicketNumbers = this.generateAndValidateTicket();
 
     const ticket = await tx.ticket.create({
       data: {
         gamePlayerId,
-        numbers: {
-          create: initialNumbers,
-        },
       },
+    });
+
+    await tx.ticketNumber.createMany({
+      data: validTicketNumbers.map((n) => ({
+        ticketId: ticket.id,
+        row: n.row,
+        column: n.column,
+        number: n.number,
+        marked: false,
+      })),
+    });
+
+    return tx.ticket.findUnique({
+      where: { id: ticket.id },
       include: {
         numbers: {
           orderBy: [
@@ -42,8 +57,6 @@ class TicketService {
         },
       },
     });
-
-    return ticket;
   }
 }
 

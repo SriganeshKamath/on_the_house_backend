@@ -23,8 +23,10 @@ async function startGame(request, response, next) {
 
     response.status(isAlreadyStarted ? 200 : 201).json({ data: { game } });
   } catch (error) {
+    console.error('START GAME ERROR:', error);
     next(error);
   }
+
 }
 
 async function getGame(request, response, next) {
