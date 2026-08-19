@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GameStatus {
+  WAITING
+  STARTING
+  IN_PROGRESS
+  FINISHED
+  CANCELLED
+}
+
+enum GamePlayerStatus {
+  ACTIVE
+  SPECTATOR
+  LEFT
+}
+
+enum PrizeType {
+  STAR
+  FIRST_ROW
+  SECOND_ROW
+  THIRD_ROW
+  FULL_HOUSE
+  HOUSE_TO_FOLLOW
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  hostedLobbies Lobby[]       @relation("LobbyHost")
+  lobbyPlayers  LobbyPlayer[]
+  gamePlayers   GamePlayer[]
+}
+
+model Lobby {
+  id                    String     @id @default(cuid())
+  code                  String     @unique
+  hostId                String
+  status                GameStatus @default(WAITING)
+  numberCallingInterval Int?
+  houseToFollowCount    Int?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  host    User          @relation("LobbyHost", fields: [hostId], references: [id], onDelete: Restrict)
+  players LobbyPlayer[]
+  game    Game?
+
+  @@index([status])
+}
+
+model LobbyPlayer {
+  id       String    @id @default(cuid())
+  lobbyId  String
+  userId   String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Restrict)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([lobbyId, userId])
+  @@index([userId])
+}
+
+model Game {
+  id         String     @id @default(cuid())
+  lobbyId    String     @unique
+  status     GameStatus @default(STARTING)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  lobby         Lobby          @relation(fields: [lobbyId], references: [id], onDelete: Restrict)
+  settings      GameSettings?
+  players       GamePlayer[]
+  calledNumbers CalledNumber[]
+  prizeClaims   PrizeClaim[]
+
+  @@index([status])
+}
+
+model GameSettings {
+  gameId                String @id
+  numberCallingInterval Int
+  houseToFollowCount    Int
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+}
+
+model GamePlayer {
+  id       String           @id @default(cuid())
+  gameId   String
+  userId   String
+  status   GamePlayerStatus @default(ACTIVE)
+  // Updated only in the same transaction that records a successful PrizeClaim.
+  score    Int              @default(0)
+  joinedAt DateTime         @default(now())
+  leftAt   DateTime?
+
+  game        Game         @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ticket      Ticket?
+  prizeClaims PrizeClaim[]
+
+  @@unique([gameId, userId])
+  @@unique([id, gameId])
+  @@index([userId])
+}
+
+model Ticket {
+  id           String   @id @default(cuid())
+  gamePlayerId String   @unique
+  createdAt    DateTime @default(now())
+
+  gamePlayer GamePlayer     @relation(fields: [gamePlayerId], references: [id], onDelete: Restrict)
+  numbers    TicketNumber[]
+}
+
+model TicketNumber {
+  id       String  @id @default(cuid())
+  ticketId String
+  row      Int
+  column   Int
+  number   Int
+  marked   Boolean @default(false)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@unique([ticketId, row, column])
+  @@unique([ticketId, number])
+  @@index([ticketId, row])
+}
+
+model CalledNumber {
+  id       String   @id @default(cuid())
+  gameId   String
+  number   Int
+  sequence Int
+  calledAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+
+  @@unique([gameId, number])
+  @@unique([gameId, sequence])
+  @@index([gameId, sequence])
+}
+
+model PrizeClaim {
+  id           String    @id @default(cuid())
+  gameId       String
+  gamePlayerId String
+  prizeType    PrizeType
+  // Fixed prizes use sequence 0; House to Follow prizes use 1-based sequences.
+  sequence     Int       @default(0)
+  points       Int
+  claimedAt    DateTime  @default(now())
+
+  game       Game       @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  gamePlayer GamePlayer @relation(fields: [gamePlayerId, gameId], references: [id, gameId], onDelete: Restrict)
+
+  @@unique([gameId, prizeType, sequence])
+  @@index([gameId, claimedAt])
+  @@index([gamePlayerId, gameId])
+}
