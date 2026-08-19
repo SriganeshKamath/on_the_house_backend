@@ -23,11 +23,17 @@ function emitGameStarted(io, lobbyId, gameResponse) {
   io.to(`lobby:${lobbyId}`).emit('game:started', { game: gameResponse });
 }
 
+function emitNumberCalled(io, gameId, payload) {
+  if (!io) return;
+  io.to(`game:${gameId}`).emit('game:number-called', payload);
+}
+
 module.exports = {
   emitLobbyPlayerJoined,
   emitLobbyPlayerLeft,
   emitLobbyCancelled,
   emitLobbySettingsUpdated,
   emitGameStarted,
+  emitNumberCalled,
 };
 

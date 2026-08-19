@@ -1,6 +1,7 @@
 const { GameService } = require('../services/game-service');
 const { getIO } = require('../sockets');
-const { emitGameStarted } = require('../sockets/socket-emitter');
+const { emitGameStarted, emitNumberCalled } = require('../sockets/socket-emitter');
+const { numberCallingService } = require('../services/number-calling-service');
 
 const gameService = new GameService();
 
@@ -16,9 +17,17 @@ async function startGame(request, response, next) {
       request.user.id,
     );
 
+    const io = getSocketServer(request);
     if (!isAlreadyStarted) {
-      const io = getSocketServer(request);
       emitGameStarted(io, lobbyId, game);
+    }
+    
+    // Ensure the caller is running for the game
+    if (!numberCallingService.isRunning(game.id) && game.status === 'IN_PROGRESS') {
+      numberCallingService.setSocketEmitter({
+        emitNumberCalled: (gId, payload) => emitNumberCalled(io || getIO(), gId, payload),
+      });
+      numberCallingService.start(game.id).catch((err) => console.error('Failed to start NumberCaller:', err));
     }
 
     response.status(isAlreadyStarted ? 200 : 201).json({ data: { game } });
