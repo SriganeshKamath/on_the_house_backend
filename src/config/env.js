@@ -9,7 +9,9 @@ const environmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     DATABASE_URL: z.url(),
     CORS_ORIGIN: z.string().min(1).optional(),
-    JWT_SECRET: z.string().min(32).optional(),
+    JWT_SECRET: z.string().min(32),
+    JWT_EXPIRES_IN: z.string().regex(/^\d+[smhd]$/).default('1h'),
+    BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(14).default(12),
   })
   .superRefine((environment, context) => {
     if (environment.NODE_ENV === 'production' && !environment.CORS_ORIGIN) {

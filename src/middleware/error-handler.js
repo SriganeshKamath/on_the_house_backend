@@ -1,7 +1,12 @@
 const env = require('../config/env');
-const { INTERNAL_SERVER_ERROR } = require('../constants/http-status');
+const { BAD_REQUEST, INTERNAL_SERVER_ERROR } = require('../constants/http-status');
 
 function errorHandler(error, _request, response, _next) {
+  if (error instanceof SyntaxError && 'body' in error) {
+    response.status(BAD_REQUEST).json({ error: { message: 'Invalid JSON request body.' } });
+    return;
+  }
+
   const statusCode = error.isOperational ? error.statusCode : INTERNAL_SERVER_ERROR;
   const message = error.isOperational ? error.message : 'Internal server error.';
 
